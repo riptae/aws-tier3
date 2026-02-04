@@ -73,7 +73,25 @@ resource "aws_subnet" "private_b" {
   }
 }
 # private d for DB 
+resource "aws_subnet" "private_c" {
+  vpc_id                  = aws_vpc.plate.id
+  cidr_block              = "10.7.5.0/24"
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "private-c"
+  }
+}
+
 # private e for DB (multi-AZs)
+resource "aws_subnet" "private_d" {
+  vpc_id                  = aws_vpc.plate.id
+  cidr_block              = "10.7.6.0/24"
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "private-d"
+  }
+}
+
 ###########################
 
 ########## GW #############
@@ -121,7 +139,9 @@ resource "aws_route_table" "private_rt1" {
 }
 
 # private rt_2
-
+resource "aws_route_table" "private_rt2" {
+  vpc_id = aws_vpc.plate.id
+}
 # no route for DB
 
 #############################
@@ -138,21 +158,30 @@ resource "aws_route_table_association" "assoc_1" {
   subnet_id      = aws_subnet.public_b.id
 }
 
-# private b + rt1
+# private a + rt1
 resource "aws_route_table_association" "assoc_2" {
   route_table_id = aws_route_table.private_rt1.id
   subnet_id      = aws_subnet.private_a.id
 }
 
-# private c + rt1
+# private b + rt1
 resource "aws_route_table_association" "assoc_3" {
   route_table_id = aws_route_table.private_rt1.id
   subnet_id      = aws_subnet.private_b.id
 
 }
 
+# private c + rt2
+resource "aws_route_table_association" "assoc_4" {
+  route_table_id = aws_route_table.private_rt2.id
+  subnet_id      = aws_subnet.private_c.id
+}
+
 # private d + rt2
-# private e + rt2
+resource "aws_route_table_association" "assoc_5" {
+  route_table_id = aws_route_table.private_rt2.id
+  subnet_id      = aws_subnet.private_d.id
+}
 ###############################
 
 ######### Security Group #######
@@ -160,7 +189,7 @@ resource "aws_route_table_association" "assoc_3" {
 
 # Bastion SG
 resource "aws_security_group" "Bastion_SG" {
-    name = "Bastion-SG"
+  name   = "Bastion-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port   = 22
@@ -179,7 +208,7 @@ resource "aws_security_group" "Bastion_SG" {
 
 # ALB SG
 resource "aws_security_group" "ALB_SG" {
-    name = "ALB-SG"
+  name   = "ALB-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port   = 80
@@ -208,7 +237,7 @@ resource "aws_security_group" "ALB_SG" {
 # 80 in + from "ALB_SG"
 # out ALL
 resource "aws_security_group" "WEB_SG" {
-    name = "WEB-SG"
+  name   = "WEB-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port       = 22
@@ -237,7 +266,7 @@ resource "aws_security_group" "WEB_SG" {
 # 8080 in + from "WEB_SG"
 # out ALL
 resource "aws_security_group" "APP_SG" {
-    name = "APP-SG"
+  name   = "APP-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port       = 22
@@ -262,7 +291,17 @@ resource "aws_security_group" "APP_SG" {
 
 # DB SG
 # 3306 in + from "APP_SG"
-# 
+resource "aws_security_group" "DB_SG" {
+  name   = "DB_SG"
+  vpc_id = aws_vpc.plate.id
+
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.APP_SG.id]
+  }
+}
 
 ##################################
 
@@ -403,6 +442,54 @@ EOF
 
 
 # DB Subnet Group
+resource "aws_db_subnet_group" "aws_db_subnet_group" {
+  name = "main-db-subnet-group"
+  subnet_ids = [
+    aws_subnet.private_c.id,
+    aws_subnet.private_d.id
+  ]
+  tags = {
+    Name = "main-db-subnet-group"
+  }
+}
+
 # RDS
+resource "aws_db_instance" "DB" {
+
+  db_subnet_group_name   = aws_db_subnet_group.aws_db_subnet_group.name
+  vpc_security_group_ids = [aws_security_group.DB_SG.id]
+
+  identifier        = "main-mysql"
+  engine            = "mysql"
+  engine_version    = "8.0"
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+  storage_type      = "gp3"
+  storage_encrypted = true
+
+  username = "manage"
+  password = "Password123!"
+
+  multi_az            = true
+  publicly_accessible = false
+
+  port    = 3306
+  db_name = "DB"
+
+  backup_retention_period = 7
+  maintenance_window      = "sun:16:00-sun:17:00"
+  backup_window           = "15:00-16:00"
+
+  deletion_protection = false
+  skip_final_snapshot = true
+  apply_immediately   = false
+
+  tags = {
+    Name = "main-mysql"
+  }
+
+}
+
+
 
 ####################################
