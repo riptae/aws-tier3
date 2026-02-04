@@ -37,7 +37,7 @@ resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.plate.id
   cidr_block              = "10.7.1.0/24"
   map_public_ip_on_launch = true
-  availability_zone = "ap-northeast-2a"
+  availability_zone       = "ap-northeast-2a"
   tags = {
     Name = "public-a"
   }
@@ -47,24 +47,31 @@ resource "aws_subnet" "public_b" {
   vpc_id                  = aws_vpc.plate.id
   cidr_block              = "10.7.2.0/24"
   map_public_ip_on_launch = true
-  availability_zone = "ap-northeast-2b"
+  availability_zone       = "ap-northeast-2b"
   tags = {
     Name = "public-b"
   }
 }
 
 # private b for Web
-resource "aws_subnet" "private_b" {
+resource "aws_subnet" "private_a" {
   vpc_id                  = aws_vpc.plate.id
   cidr_block              = "10.7.3.0/24"
   map_public_ip_on_launch = false
   tags = {
-    Name = "public-b"
+    Name = "private-a"
   }
 }
 
 # private c for App
-
+resource "aws_subnet" "private_b" {
+  vpc_id                  = aws_vpc.plate.id
+  cidr_block              = "10.7.4.0/24"
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "private-b"
+  }
+}
 # private d for DB 
 # private e for DB (multi-AZs)
 ###########################
@@ -114,24 +121,35 @@ resource "aws_route_table" "private_rt1" {
 }
 
 # private rt_2
+
 # no route for DB
 
 #############################
 
 ######## assoc ###############
 # public a + rt0 
-resource "aws_route_table_association" "assoc0" {
+resource "aws_route_table_association" "assoc_0" {
   route_table_id = aws_route_table.public_rt0.id
   subnet_id      = aws_subnet.public_a.id
 }
 
+resource "aws_route_table_association" "assoc_1" {
+  route_table_id = aws_route_table.public_rt0.id
+  subnet_id      = aws_subnet.public_b.id
+}
+
 # private b + rt1
-resource "aws_route_table_association" "assoc1" {
+resource "aws_route_table_association" "assoc_2" {
   route_table_id = aws_route_table.private_rt1.id
-  subnet_id      = aws_subnet.private_b.id
+  subnet_id      = aws_subnet.private_a.id
 }
 
 # private c + rt1
+resource "aws_route_table_association" "assoc_3" {
+  route_table_id = aws_route_table.private_rt1.id
+  subnet_id      = aws_subnet.private_b.id
+
+}
 
 # private d + rt2
 # private e + rt2
@@ -142,12 +160,13 @@ resource "aws_route_table_association" "assoc1" {
 
 # Bastion SG
 resource "aws_security_group" "Bastion_SG" {
+    name = "Bastion-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["125.176.211.158/32"] // MYIP
+    cidr_blocks = ["106.101.137.103/32"] // MYIP
   }
 
   egress {
@@ -160,6 +179,7 @@ resource "aws_security_group" "Bastion_SG" {
 
 # ALB SG
 resource "aws_security_group" "ALB_SG" {
+    name = "ALB-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port   = 80
@@ -188,6 +208,7 @@ resource "aws_security_group" "ALB_SG" {
 # 80 in + from "ALB_SG"
 # out ALL
 resource "aws_security_group" "WEB_SG" {
+    name = "WEB-SG"
   vpc_id = aws_vpc.plate.id
   ingress {
     from_port       = 22
@@ -215,6 +236,29 @@ resource "aws_security_group" "WEB_SG" {
 # 22 in + from "Bastion_SG"
 # 8080 in + from "WEB_SG"
 # out ALL
+resource "aws_security_group" "APP_SG" {
+    name = "APP-SG"
+  vpc_id = aws_vpc.plate.id
+  ingress {
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.Bastion_SG.id]
+  }
+  ingress {
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.WEB_SG.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
 
 # DB SG
 # 3306 in + from "APP_SG"
@@ -329,7 +373,34 @@ systemctl restart sshd
 EOF
 
 }
+
+
 # EC2 APP
+resource "aws_instance" "APP" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.micro"
+  subnet_id                   = aws_subnet.private_b.id
+  vpc_security_group_ids      = [aws_security_group.APP_SG.id]
+  associate_public_ip_address = false
+  user_data                   = <<-EOF
+#!/bin/bash
+set -eux
+
+# ec2-user 비밀번호 설정
+echo 'ec2-user:password' | chpasswd
+
+# sshd 설정 변경 (비밀번호 로그인 허용)
+sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^ChallengeResponseAuthentication no/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^UsePAM yes/UsePAM yes/' /etc/ssh/sshd_config
+
+# SSH 재시작
+systemctl restart sshd
+EOF
+
+}
+
 
 # DB Subnet Group
 # RDS
