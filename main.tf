@@ -4,23 +4,31 @@ terraform {
 
   required_providers {
     aws = {
-        source = "hashicorp/aws"
-        version = "~> 5.0"
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
 
     random = {
-        source = "hashicorp/random"
-        version = "~> 3.0"
+      source  = "hashicorp/random"
+      version = "~> 3.0"
     }
   }
 }
 
 provider "aws" {
-    region = "ap-northeast-2"
+  region = "ap-northeast-2"
 }
 
 ######### VPC #########
-# main
+resource "aws_vpc" "plate" {
+  cidr_block           = "10.7.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  tags = {
+    Name = "tier-3"
+  }
+}
+
 ######################
 
 ########## Subnet ###########
@@ -39,22 +47,22 @@ provider "aws" {
 
 #### Route Table #############
 # public rt0
-  # route (local + IGW)
+# route (local + IGW)
 
 # private rt_1
-  # route (local + NATGW)
+# route (local + NATGW)
 
 # private rt_2
-  # no route for DB
+# no route for DB
 
 #############################
 
 ######## assoc ###############
-    # public a + rt0 
-    # private b + rt1
-    # private c + rt1
-    # private d + rt2
-    # private e + rt2
+# public a + rt0 
+# private b + rt1
+# private c + rt1
+# private d + rt2
+# private e + rt2
 ###############################
 
 ######### Security Group #######
@@ -62,27 +70,27 @@ provider "aws" {
 # myIP
 
 # Bastion SG
-    # 22 in + from "my_IP"
-    # out ALL
+# 22 in + from "my_IP"
+# out ALL
 
 # ALB SG
-    # 80 in
-    # 443 in
-    # out ALL
-    
+# 80 in
+# 443 in
+# out ALL
+
 # WEB SG
-    # 22 in + from "Bastion_SG"
-    # 80 in + from "ALB_SG"
-    # out ALL
+# 22 in + from "Bastion_SG"
+# 80 in + from "ALB_SG"
+# out ALL
 
 # APP SG
-    # 22 in + from "Bastion_SG"
-    # 8080 in + from "WEB_SG"
-    # out ALL
+# 22 in + from "Bastion_SG"
+# 8080 in + from "WEB_SG"
+# out ALL
 
 # DB SG
-    # 3306 in + from "APP_SG"
-    # 
+# 3306 in + from "APP_SG"
+# 
 
 ##################################
 
