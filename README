@@ -12,3 +12,10 @@ providers
 [2] // 260224
 설계
 VPC
+
+-
+
+[3]
+ALB
+Bastion
+WEB EC2
