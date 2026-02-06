@@ -323,7 +323,10 @@ resource "aws_lb_listener" "listener" {
 
 resource "aws_lb" "web_lb" {
   load_balancer_type = "application"
-  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+  subnets            = [
+    aws_subnet.public_a.id, 
+    aws_subnet.public_b.id,
+    aws_subnet.private_b.id]
   security_groups    = [aws_security_group.ALB_SG.id]
 }
 

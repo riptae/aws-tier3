@@ -32,7 +32,14 @@ DB
 
 -
 
-[6]
+[6] 260206
 BASTION / WEB / APP HOSTNAME변경
 BASTION -> WEB TEST 성공
 BASTION -> APP -> MYSQL 접속 성공
+
+-
+
+[7] // 2호선
+- CLIENT ---(80/443)---> LB -----(80)----> WEB(정적 페이지 반환)
+- 80포트 리슨 확인
+- LB subnet에 private b (for WEB) 추가 후 정상작동 확인
