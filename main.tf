@@ -77,6 +77,7 @@ resource "aws_subnet" "private_c" {
   vpc_id                  = aws_vpc.plate.id
   cidr_block              = "10.7.5.0/24"
   map_public_ip_on_launch = false
+  availability_zone       = "ap-northeast-2c"
   tags = {
     Name = "private-c"
   }
@@ -87,6 +88,7 @@ resource "aws_subnet" "private_d" {
   vpc_id                  = aws_vpc.plate.id
   cidr_block              = "10.7.6.0/24"
   map_public_ip_on_launch = false
+  availability_zone       = "ap-northeast-2d"
   tags = {
     Name = "private-d"
   }
@@ -373,6 +375,13 @@ resource "aws_instance" "bastion" {
 #!/bin/bash
 set -eux
 
+########################################
+# 1. Hostname 변경
+########################################
+hostnamectl set-hostname BASTION
+
+# cloud-init이 hostname 덮어쓰지 않도록
+sed -i 's/^preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg || echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
 # ec2-user 비밀번호 설정
 echo 'ec2-user:password' | chpasswd
 
@@ -387,6 +396,7 @@ systemctl restart sshd
 EOF
 
 }
+
 # EC2 WEB
 resource "aws_instance" "web" {
   ami                         = data.aws_ami.al2023.id
@@ -397,6 +407,14 @@ resource "aws_instance" "web" {
   user_data                   = <<-EOF
 #!/bin/bash
 set -eux
+
+########################################
+# 1. Hostname 변경
+########################################
+hostnamectl set-hostname WEB
+
+# cloud-init이 hostname 덮어쓰지 않도록
+sed -i 's/^preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg || echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
 
 # ec2-user 비밀번호 설정
 echo 'ec2-user:password' | chpasswd
@@ -424,6 +442,14 @@ resource "aws_instance" "APP" {
   user_data                   = <<-EOF
 #!/bin/bash
 set -eux
+
+########################################
+# 1. Hostname 변경
+########################################
+hostnamectl set-hostname APP
+
+# cloud-init이 hostname 덮어쓰지 않도록
+sed -i 's/^preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg || echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
 
 # ec2-user 비밀번호 설정
 echo 'ec2-user:password' | chpasswd

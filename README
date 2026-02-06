@@ -25,3 +25,14 @@ WEB EC2
 [4] // 260205 - 1호선
 APP
 
+-
+
+[5] 
+DB
+
+-
+
+[6]
+BASTION / WEB / APP HOSTNAME변경
+BASTION -> WEB TEST 성공
+BASTION -> APP -> MYSQL 접속 성공
